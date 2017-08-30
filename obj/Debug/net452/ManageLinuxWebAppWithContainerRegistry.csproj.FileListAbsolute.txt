@@ -1,0 +1,4 @@
+C:\Sources\dotnet-samples\app-service-dotnet-deploy-image-from-acr-to-linux\bin\Debug\net452\ManageLinuxWebAppWithContainerRegistry.runtimeconfig.json
+C:\Sources\dotnet-samples\app-service-dotnet-deploy-image-from-acr-to-linux\bin\Debug\net452\ManageLinuxWebAppWithContainerRegistry.runtimeconfig.dev.json
+C:\Sources\dotnet-samples\app-service-dotnet-deploy-image-from-acr-to-linux\obj\Debug\net452\ManageLinuxWebAppWithContainerRegistry.csproj.ManageLinuxWebAppWithContainerRegistry.exe.config
+C:\Sources\dotnet-samples\app-service-dotnet-deploy-image-from-acr-to-linux\obj\Debug\net452\ManageLinuxWebAppWithContainerRegistry.csproj.CoreCompileInputs.cache

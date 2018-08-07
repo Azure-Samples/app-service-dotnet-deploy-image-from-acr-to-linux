@@ -1,10 +1,10 @@
 ---
-services: App
-platforms: .Net
+services: App-Service
+platforms: dotnet
 author: jianghaolu
 ---
 
-# Getting Started with App - Manage Linux Web App With Container Registry - in .Net #
+# Deploy a container image from Azure Container Registry to Linux containers in App Service using C# #
 
           Azure App Service sample for deploying from an Azure Container Registry.
              - Create an Azure Container Registry to be used for holding the Docker images
@@ -20,7 +20,7 @@ author: jianghaolu
 
 To run this sample:
 
-Set the environment variable `AZURE_AUTH_LOCATION` with the full path for an auth file. See [how to create an auth file](https://github.com/Azure/azure-sdk-for-net/blob/Fluent/AUTH.md).
+Set the environment variable `AZURE_AUTH_LOCATION` with the full path for an auth file. See [how to create an auth file](https://github.com/Azure/azure-libraries-for-java/blob/master/AUTH.md).
 
     git clone https://github.com/Azure-Samples/app-service-dotnet-deploy-image-from-acr-to-linux.git
 

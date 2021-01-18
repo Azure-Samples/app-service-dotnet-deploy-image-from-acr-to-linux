@@ -5,8 +5,8 @@ languages:
 products:
 - azure
 extensions:
-- services: App-Service
-- platforms: dotnet
+  services: App-Service
+  platforms: dotnet
 ---
 
 # Deploy a container image from Azure Container Registry to Linux containers in App Service using C# #

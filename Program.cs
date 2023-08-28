@@ -166,7 +166,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                     var webSite = webSite_lro.Value;
 
                     Utilities.Log("Created web app " + webSite.Data.Name);
-                    Utilities.Print(app);
+                    Utilities.Print(website);
 
                     // warm up
                     Utilities.Log("Warming up " + appUrl + "...");

@@ -19,6 +19,7 @@ using Microsoft.Azure.Management.Samples.Common;
 using Azure.ResourceManager.ContainerRegistry.Models;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace ManageLinuxWebAppWithContainerRegistry
 {
@@ -35,7 +36,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
          *    - Deploys to a new web app from the Tomcat image
          */
 
-        public static void RunSample(ArmClient client)
+        public static async Task RunSample(ArmClient client)
         {
             string rgName = Utilities.CreateRandomName("rgACR");
             string acrName = Utilities.CreateRandomName("acrsample");
@@ -46,7 +47,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
             string dockerImageName = "tomcat";
             string dockerImageTag = "8-jre8";
             string dockerContainerName = "tomcat-privates";
-            var lro = client.GetDefaultSubscription().GetResourceGroups().CreateOrUpdate(Azure.WaitUntil.Completed, rgName, new ResourceGroupData(AzureLocation.EastUS));
+            var lro =await client.GetDefaultSubscription().GetResourceGroups().CreateOrUpdateAsync(Azure.WaitUntil.Completed, rgName, new ResourceGroupData(AzureLocation.EastUS));
             var resourceGroup = lro.Value;
 
             try
@@ -60,7 +61,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                 var registryContainerData = new ContainerRegistryData(region, new ContainerRegistrySku(ContainerRegistrySkuName.Standard));
                 {
                 };
-                var registryContainer_lro = registryContainerCollection.CreateOrUpdate(Azure.WaitUntil.Completed, acrName, registryContainerData);
+                var registryContainer_lro =await registryContainerCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, acrName, registryContainerData);
                 var registryContainer = registryContainer_lro.Value;
 
                 Utilities.Print(registryContainer);
@@ -162,11 +163,11 @@ namespace ManageLinuxWebAppWithContainerRegistry
                             }
                         }
                     };
-                    var webSite_lro = webSiteCollection.CreateOrUpdate(Azure.WaitUntil.Completed, appName, webSiteData);
+                    var webSite_lro =await webSiteCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, appName, webSiteData);
                     var webSite = webSite_lro.Value;
 
                     Utilities.Log("Created web app " + webSite.Data.Name);
-                    Utilities.Print(website);
+                    Utilities.Print(webSite);
 
                     // warm up
                     Utilities.Log("Warming up " + appUrl + "...");
@@ -192,7 +193,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
             }
         }
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             try
             {
@@ -208,7 +209,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                 // Print selected subscription
                 Utilities.Log("Selected subscription: " + client.GetSubscriptions().Id);
 
-                RunSample(client);
+                await RunSample(client);
             }
             catch (Exception e)
             {

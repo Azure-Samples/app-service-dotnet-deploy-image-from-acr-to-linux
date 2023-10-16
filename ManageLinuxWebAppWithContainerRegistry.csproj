@@ -82,4 +82,8 @@
     <PackageReference Include="Microsoft.Azure.DocumentDB" Version="1.14.1" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Asset\" />
+  </ItemGroup>
+
 </Project>

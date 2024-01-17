@@ -2,15 +2,24 @@
 // Licensed under the MIT License. See License.txt in the project root for license information.
 
 using Docker.DotNet;
-using Microsoft.Azure.Management.AppService.Fluent;
-using Microsoft.Azure.Management.ContainerRegistry.Fluent;
-using Microsoft.Azure.Management.ContainerRegistry.Fluent.Models;
-using Microsoft.Azure.Management.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent;
-using Microsoft.Azure.Management.ResourceManager.Fluent.Core;
-using Microsoft.Azure.Management.Samples.Common;
+using Azure.Core;
+using Azure.Identity;
+using Azure.ResourceManager;
+using Azure.ResourceManager.AppService;
+using Azure.ResourceManager.CosmosDB;
+using Azure.ResourceManager.CosmosDB.Models;
+using Azure.ResourceManager.KeyVault;
+using Azure.ResourceManager.KeyVault.Models;
+using Azure.ResourceManager.Resources;
+using Azure.ResourceManager.ContainerRegistry;
+using Azure.ResourceManager.Samples.Common;
 using System;
 using System.IO;
+using Microsoft.Azure.Management.Samples.Common;
+using Azure.ResourceManager.ContainerRegistry.Models;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace ManageLinuxWebAppWithContainerRegistry
 {
@@ -27,17 +36,19 @@ namespace ManageLinuxWebAppWithContainerRegistry
          *    - Deploys to a new web app from the Tomcat image
          */
 
-        public static void RunSample(IAzure azure)
+        public static async Task RunSample(ArmClient client)
         {
-            string rgName = SdkContext.RandomResourceName("rgACR", 15);
-            string acrName = SdkContext.RandomResourceName("acrsample", 20);
-            string saName = SdkContext.RandomResourceName("sa", 20);
-            string appName = SdkContext.RandomResourceName("webapp", 20);
+            string rgName = Utilities.CreateRandomName("rgACR");
+            string acrName = Utilities.CreateRandomName("acrsample");
+            string saName = Utilities.CreateRandomName("sa");
+            string appName = Utilities.CreateRandomName("webapp");
             string appUrl = appName + ".azurewebsites.net";
-            Region region = Region.USWest;
+            AzureLocation region = AzureLocation.EastUS;
             string dockerImageName = "tomcat";
             string dockerImageTag = "8-jre8";
             string dockerContainerName = "tomcat-privates";
+            var lro =await client.GetDefaultSubscription().GetResourceGroups().CreateOrUpdateAsync(Azure.WaitUntil.Completed, rgName, new ResourceGroupData(AzureLocation.EastUS));
+            var resourceGroup = lro.Value;
 
             try
             {
@@ -46,21 +57,21 @@ namespace ManageLinuxWebAppWithContainerRegistry
 
                 Utilities.Log("Creating an Azure Container Registry");
 
-                IRegistry azureRegistry = azure.ContainerRegistries.Define(acrName)
-                        .WithRegion(region)
-                        .WithNewResourceGroup(rgName)
-                        .WithBasicSku()
-                        .WithRegistryNameAsAdminUser()
-                        .Create();
+                var registryContainerCollection = resourceGroup.GetContainerRegistries();
+                var registryContainerData = new ContainerRegistryData(region, new ContainerRegistrySku(ContainerRegistrySkuName.Standard));
+                {
+                };
+                var registryContainer_lro =await registryContainerCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, acrName, registryContainerData);
+                var registryContainer = registryContainer_lro.Value;
 
-                Utilities.Print(azureRegistry);
+                Utilities.Print(registryContainer);
 
-                var acrCredentials = azureRegistry.GetCredentials();
+                var acrCredentials = (registryContainer.GetCredentials()).Value;
 
                 //=============================================================
                 // Create a Docker client that will be used to push/pull images to/from the Azure Container Registry
 
-                using (DockerClient dockerClient = DockerUtils.CreateDockerClient(azure, rgName, region))
+                using (DockerClient dockerClient = DockerUtils.CreateDockerClient(client, rgName, region))
                 {
                     var pullImgResult = dockerClient.Images.PullImage(
                         new Docker.DotNet.Models.ImagesPullParameters()
@@ -101,7 +112,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                     //=============================================================
                     // Commit the new container
 
-                    string privateRepoUrl = azureRegistry.LoginServerUrl + "/samples/" + dockerContainerName;
+                    string privateRepoUrl = registryContainer.Data.LoginServer + "/samples/" + dockerContainerName;
                     Utilities.Log("Commiting image at: " + privateRepoUrl);
 
                     var commitContainerResult = dockerClient.Miscellaneous.CommitContainerChanges(
@@ -115,6 +126,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                     //=============================================================
                     // Push the new Docker image to the Azure Container Registry
 
+                    var password = acrCredentials.Passwords[0];
                     var pushImageResult = dockerClient.Images.PushImage(privateRepoUrl,
                         new Docker.DotNet.Models.ImagePushParameters()
                         {
@@ -124,8 +136,8 @@ namespace ManageLinuxWebAppWithContainerRegistry
                         new Docker.DotNet.Models.AuthConfig()
                         {
                             Username = acrCredentials.Username,
-                            Password = acrCredentials.AccessKeys[AccessKeyType.Primary],
-                            ServerAddress = azureRegistry.LoginServerUrl
+                            Password = password.Value,
+                            ServerAddress = registryContainer.Data.LoginServer
                         });
 
                     //============================================================
@@ -133,22 +145,34 @@ namespace ManageLinuxWebAppWithContainerRegistry
 
                     Utilities.Log("Creating web app " + appName + " in resource group " + rgName + "...");
 
-                    IWebApp app = azure.WebApps.Define(appName)
-                            .WithRegion(Region.USWest)
-                            .WithExistingResourceGroup(rgName)
-                            .WithNewLinuxPlan(PricingTier.StandardS1)
-                            .WithPrivateRegistryImage(privateRepoUrl + ":latest", "http://" + azureRegistry.LoginServerUrl)
-                            .WithCredentials(acrCredentials.Username, acrCredentials.AccessKeys[AccessKeyType.Primary])
-                            .WithAppSetting("PORT", "8080")
-                            .Create();
 
-                    Utilities.Log("Created web app " + app.Name);
-                    Utilities.Print(app);
+                    var webSiteCollection = resourceGroup.GetWebSites();
+                    var webSiteData = new WebSiteData(region)
+                    {
+                        SiteConfig = new Azure.ResourceManager.AppService.Models.SiteConfigProperties()
+                        {
+                            WindowsFxVersion = "PricingTier.StandardS1",
+                            NetFrameworkVersion = "NetFrameworkVersion.V4_6",
+                            AppSettings =
+                            {
+                                new Azure.ResourceManager.AppService.Models.AppServiceNameValuePair()
+                                {
+                                    Name = "PORT",
+                                    Value = "8080"
+                                }
+                            }
+                        }
+                    };
+                    var webSite_lro =await webSiteCollection.CreateOrUpdateAsync(Azure.WaitUntil.Completed, appName, webSiteData);
+                    var webSite = webSite_lro.Value;
+
+                    Utilities.Log("Created web app " + webSite.Data.Name);
+                    Utilities.Print(webSite);
 
                     // warm up
                     Utilities.Log("Warming up " + appUrl + "...");
                     Utilities.CheckAddress("http://" + appUrl);
-                    SdkContext.DelayProvider.Delay(5000);
+                    Thread.Sleep(5000);
                     Utilities.Log("CURLing " + appUrl + "...");
                     Utilities.Log(Utilities.CheckAddress("http://" + appUrl));
 
@@ -159,7 +183,7 @@ namespace ManageLinuxWebAppWithContainerRegistry
                 try
                 {
                     Utilities.Log("Deleting Resource Group: " + rgName);
-                    azure.ResourceGroups.BeginDeleteByName(rgName);
+                    resourceGroup.Delete(Azure.WaitUntil.Completed);
                     Utilities.Log("Deleted Resource Group: " + rgName);
                 }
                 catch (Exception)
@@ -169,24 +193,23 @@ namespace ManageLinuxWebAppWithContainerRegistry
             }
         }
 
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             try
             {
                 //=================================================================
                 // Authenticate
-                var credentials = SdkContext.AzureCredentialsFactory.FromFile(Environment.GetEnvironmentVariable("AZURE_AUTH_LOCATION"));
-
-                var azure = Azure
-                    .Configure()
-                    .WithLogLevel(HttpLoggingDelegatingHandler.Level.Basic)
-                    .Authenticate(credentials)
-                    .WithDefaultSubscription();
+                var clientId = Environment.GetEnvironmentVariable("CLIENT_ID");
+                var clientSecret = Environment.GetEnvironmentVariable("CLIENT_SECRET");
+                var tenantId = Environment.GetEnvironmentVariable("TENANT_ID");
+                var subscription = Environment.GetEnvironmentVariable("SUBSCRIPTION_ID");
+                ClientSecretCredential credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+                ArmClient client = new ArmClient(credential, subscription);
 
                 // Print selected subscription
-                Utilities.Log("Selected subscription: " + azure.SubscriptionId);
+                Utilities.Log("Selected subscription: " + client.GetSubscriptions().Id);
 
-                RunSample(azure);
+                await RunSample(client);
             }
             catch (Exception e)
             {
